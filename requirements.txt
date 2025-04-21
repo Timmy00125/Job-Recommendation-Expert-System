@@ -1,0 +1,5 @@
+# frozendict==2.3.8
+experta
+flask
+scikit-learn
+pandas
