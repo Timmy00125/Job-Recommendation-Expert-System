@@ -6,6 +6,12 @@ A sophisticated job recommendation application that combines TF-IDF text analysi
 
 This application helps job seekers find relevant employment opportunities by analyzing job descriptions and matching them against user-specified keywords and preferences. The system uses both text similarity (TF-IDF and cosine similarity) and rule-based matching to provide personalized recommendations.
 
+## TEAM MEMBERS
+
+- **OLUWASEYI TIMILEHIN VUG/SEN/23/9844**
+- **JIRGBA ERNEST MSUGHTER VUG/SEN/22/8298**
+- **Sangari Abraham Vug/Sen/22/7970**
+
 ## Features
 
 - **Keyword-Based Search**: Find jobs matching specific skills, technologies, or requirements
