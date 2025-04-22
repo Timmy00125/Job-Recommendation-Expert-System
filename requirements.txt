@@ -3,3 +3,11 @@ experta
 flask
 scikit-learn
 pandas
+nltk==3.9.1
+numpy==1.24.4
+blinker==1.8.2
+click==8.1.8
+MarkupSafe==2.1.5
+regex==2024.11.6
+schema==0.6.7
+tzdata==2025.2
