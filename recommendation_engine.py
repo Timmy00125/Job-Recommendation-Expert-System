@@ -1,3 +1,5 @@
+import os
+import zipfile
 import pandas as pd
 import numpy as np
 import nltk
@@ -6,29 +8,68 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from experta import KnowledgeEngine, Fact, Field, DefFacts, Rule, MATCH
 
+# ---------- Data Setup Helpers ----------
+def ensure_data_unzipped(zip_path="archive.zip", extract_dir="data"):
+    """
+    If archive.zip exists and our CSV isn’t already in data/,
+    unzip it there.
+    """
+    # Peek inside archive.zip to find the CSV
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
+        if not csv_files:
+            raise FileNotFoundError("No CSV found inside archive.zip")
+        csv_name = csv_files[0]
+
+        target_path = os.path.join(extract_dir, os.path.basename(csv_name))
+        if not os.path.exists(target_path):
+            os.makedirs(extract_dir, exist_ok=True)
+            print(f"Unzipping {zip_path} → {extract_dir}/")
+            z.extract(csv_name, extract_dir)
+            extracted = os.path.join(extract_dir, csv_name)
+            if extracted != target_path:
+                os.replace(extracted, target_path)
+                # clean up empty dirs
+                subdir = os.path.dirname(extracted)
+                if subdir and os.path.isdir(subdir):
+                    try:
+                        os.rmdir(subdir)
+                    except OSError:
+                        pass
+        else:
+            print(f"{target_path} already exists, skipping unzip.")
+    return target_path
+
 # ---------- Data & Model Setup ----------
 # 1. Load and preprocess data
-def load_data():
-    df = pd.read_csv('data job posts.csv')
-    df.dropna(subset=['Title','JobDescription','JobRequirment','RequiredQual'], inplace=True)
+def load_data(zip_path="archive.zip"):
+    # Ensure data folder and CSV exist
+    csv_path = ensure_data_unzipped(zip_path=zip_path, extract_dir="data")
+    df = pd.read_csv(csv_path)
+    df.dropna(subset=['Title', 'JobDescription', 'JobRequirment', 'RequiredQual'], inplace=True)
     df['Location'] = df['Location'].fillna('').astype(str)
     df['IT'] = df['IT'].fillna(0).astype(int)
     return df
 
+
 def setup_nlp():
     nltk.download('stopwords', quiet=True)
     
+
 def clean_text(text):
     from nltk.corpus import stopwords
     text = str(text).lower()
     text = re.sub(r'[^a-z0-9\s]', ' ', text)
     return ' '.join([w for w in text.split() if w not in stopwords.words('english')])
 
+
 def prepare_data(df):
-    df['text'] = (df['Title'] + ' ' + 
-                 df['JobDescription'] + ' ' + 
-                 df['JobRequirment'] + ' ' + 
-                 df['RequiredQual']).apply(clean_text)
+    df['text'] = (
+        df['Title'] + ' ' \
+        + df['JobDescription'] + ' ' \
+        + df['JobRequirment'] + ' ' \
+        + df['RequiredQual']
+    ).apply(clean_text)
     return df
 
 # 2. TF-IDF
@@ -71,38 +112,50 @@ class JobExpert(KnowledgeEngine):
 def compute_rule_score(row, prefs):
     eng = JobExpert()
     eng.reset()
-    eng.declare(UserPrefs(location=str(prefs.get('location','')), 
-                         it_preference=int(prefs.get('it_preference',0))))
-    eng.declare(JobFact(id=int(row.name), location=row['Location'], it_flag=row['IT']))
+    eng.declare(
+        UserPrefs(
+            location=str(prefs.get('location','')), 
+            it_preference=int(prefs.get('it_preference',0))
+        )
+    )
+    eng.declare(
+        JobFact(
+            id=int(row.name), 
+            location=row['Location'], 
+            it_flag=row['IT']
+        )
+    )
     eng.run()
-    return sum(1 for f in eng.facts.values() if isinstance(f, Fact) and f.get('rule_score', False))
+    return sum(
+        1 for f in eng.facts.values()
+        if isinstance(f, Fact) and f.get('rule_score', False)
+    )
 
 # 6. Recommendation
-def recommend_jobs(query, prefs, df, vectorizer, job_tfidf, alpha=0.7, beta=0.3, top_n=10):
+def recommend_jobs(
+    query, prefs, df, vectorizer, job_tfidf,
+    alpha=0.7, beta=0.3, top_n=10
+):
     cos = compute_cosine_scores(query, vectorizer, job_tfidf)
-    rules = np.array([compute_rule_score(r, prefs) for _, r in df.iterrows()], dtype=float)
-    
-    # Normalize rule scores if any are non-zero
+    rules = np.array([
+        compute_rule_score(r, prefs) for _, r in df.iterrows()
+    ], dtype=float)
     if rules.max() > 0:
         rules = rules / rules.max()
-        
     final = alpha * cos + beta * rules
-    
-    # Prioritize location
     idx = np.argsort(final)[::-1]
     loc = prefs.get('location','').lower()
     matched = [i for i in idx if loc and loc in df.iloc[i]['Location'].lower()]
     others = [i for i in idx if i not in matched]
     ordered = (matched + others)[:top_n]
-    
     result = df.iloc[ordered][['Title','Company','Location']].copy()
     result['score'] = final[ordered]
     return result.to_dict(orient='records')
 
 # Initialize model and data
-def initialize_recommendation_system():
+def initialize_recommendation_system(zip_path="archive.zip"):
     setup_nlp()
-    df = load_data()
+    df = load_data(zip_path=zip_path)
     df = prepare_data(df)
     vectorizer = create_vectorizer()
     job_tfidf = vectorize_jobs(vectorizer, df['text'])
