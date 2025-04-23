@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Recommendations</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Job Recommendations</h1>
+        <p>Top {{results|length}} matches for your search</p>
+      </header>
+
+      <div class="card">
+        <div class="results-header">
+          <h2>Results</h2>
+          <a href="/" class="btn btn-secondary"
+            ><i class="fas fa-arrow-left"></i> New Search</a
+          >
+        </div>
+
+        <div class="table-responsive">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Company</th>
+                <th>Location</th>
+                <th>Match Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in results %}
+              <tr>
+                <td>{{r.Title}}</td>
+                <td>{{r.Company}}</td>
+                <td><i class="fas fa-map-marker-alt"></i> {{r.Location}}</td>
+                <td>
+                  <div class="score-bar">
+                    <div
+                      class="score-fill"
+                      style="width: {{(r.score * 100)|round|int}}%"
+                    ></div>
+                  </div>
+                  <span class="score-text">{{"%.2f"|format(r.score)}}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>© 2025 Job Recommender System</p>
+    </footer>
+  </body>
+</html>
